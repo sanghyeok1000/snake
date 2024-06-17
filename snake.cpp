@@ -25,7 +25,6 @@ enum Direction { UP, DOWN, LEFT, RIGHT };
 int speed = 100000; // 기본 속도 (0.1초 대기)
 int slowDownEndTime = 0; // 느린 속도가 끝나는 시간
 
-
 // Snake 구조체
 struct SnakeSegment {
     int y, x;
@@ -92,7 +91,7 @@ void updateItemAndGatePositions(std::vector<std::vector<int>> &map, std::pair<in
 }
 
 // 초기화 함수
-void initGame(WINDOW *win, std::vector<std::vector<int>> &map, std::vector<SnakeSegment> &snake, Direction &dir, int &score, std::pair<int, int> &gate1, std::pair<int, int> &gate2, int stage) {
+void initGame(WINDOW *win, std::vector<std::vector<int>> &map, std::vector<SnakeSegment> &snake, Direction &dir, int &score, int &growthItems, int &poisonItems, int &gateUses, std::pair<int, int> &gate1, std::pair<int, int> &gate2, int stage) {
     // 맵 초기화
     for (int i = 0; i < MAP_HEIGHT; ++i) {
         for (int j = 0; j < MAP_WIDTH; ++j) {
@@ -112,7 +111,6 @@ void initGame(WINDOW *win, std::vector<std::vector<int>> &map, std::vector<Snake
     map[MAP_HEIGHT - 1][0] = IMMUNE_WALL;
     map[MAP_HEIGHT - 1][MAP_WIDTH - 1] = IMMUNE_WALL;
 
-    
     // 스테이지별로 맵 지형 변경
     if (stage == 2) {
         for (int i = 5; i < 15; ++i) {
@@ -146,7 +144,7 @@ void initGame(WINDOW *win, std::vector<std::vector<int>> &map, std::vector<Snake
             map[10][i] = IMMUNE_WALL;
         }
     }
-    
+
     // Snake 초기 위치 설정
     snake.clear();
     snake.push_back({MAP_HEIGHT / 2, MAP_WIDTH / 2});
@@ -157,6 +155,9 @@ void initGame(WINDOW *win, std::vector<std::vector<int>> &map, std::vector<Snake
     }
     dir = RIGHT;
     score = 0;
+    growthItems = 0;
+    poisonItems = 0;
+    gateUses = 0;
 
     // 아이템 생성
     generateItem(map, GROWTH_ITEM);
@@ -275,13 +276,6 @@ bool moveSnake(std::vector<std::vector<int>> &map, std::vector<SnakeSegment> &sn
         case LEFT: newX--; break;
         case RIGHT: newX++; break;
     }
-    // 진행 방향의 반대 방향으로 이동하면 죽음
-    if ((dir == UP && newY > snake.front().y) || 
-        (dir == DOWN && newY < snake.front().y) || 
-        (dir == LEFT && newX > snake.front().x) || 
-        (dir == RIGHT && newX < snake.front().x)) {
-        return false;
-    }
     // 충돌 체크
     if (newY < 0 || newY >= MAP_HEIGHT || newX < 0 || newX >= MAP_WIDTH || map[newY][newX] == WALL || map[newY][newX] == SNAKE_BODY || map[newY][newX] == IMMUNE_WALL) {
         return false;
@@ -320,7 +314,7 @@ bool moveSnake(std::vector<std::vector<int>> &map, std::vector<SnakeSegment> &sn
             map[snake.back().y][snake.back().x] = 0;
             snake.pop_back();
             if (snake.size() < 3) {
-            return false; // Snake의 길이가 3 이하가 되면 게임 종료
+                return false; // Snake의 길이가 3 이하가 되면 게임 종료
             }
         } else {
             return false; // Snake의 길이가 1 이하가 되면 게임 종료
@@ -350,6 +344,7 @@ bool moveSnake(std::vector<std::vector<int>> &map, std::vector<SnakeSegment> &sn
 
     return true;
 }
+
 bool isSnakePassingGate(const std::vector<SnakeSegment> &snake, const std::pair<int, int> &gate1, const std::pair<int, int> &gate2) {
     for (const auto &segment : snake) {
         if ((segment.y == gate1.first && segment.x == gate1.second) || (segment.y == gate2.first && segment.x == gate2.second)) {
@@ -497,14 +492,15 @@ int main() {
     const int totalStages = 4;
 
     while (true) {
-    int choice = showOptions();
-    if (choice == '1') {
-        nodelay(stdscr, TRUE);
-        clear();
-        refresh();
+        int choice = showOptions();
+        if (choice == '1') {
+            nodelay(stdscr, TRUE);
+            clear();
+            refresh();
 
-        while (true) {
-            for (currentStage = 1; currentStage <= totalStages; ++currentStage) {
+            bool gameRunning = true;
+
+            while (gameRunning) {
                 std::vector<std::vector<int>> map(MAP_HEIGHT, std::vector<int>(MAP_WIDTH));
                 std::vector<SnakeSegment> snake;
                 Direction dir;
@@ -513,7 +509,7 @@ int main() {
                 int maxLength = 3;
                 int startTime = time(0);
 
-                initGame(win, map, snake, dir, score, gate1, gate2, currentStage);
+                initGame(win, map, snake, dir, score, growthItems, poisonItems, gateUses, gate1, gate2, currentStage);
                 drawMap(win, map, snake, dir);
 
                 bool missionComplete = false;
@@ -525,43 +521,48 @@ int main() {
                             if (dir != DOWN) dir = UP;
                             else {
                                 showGameOver(score, time(0) - startTime);
-                                missionComplete = false;
-                                break;
+                                missionComplete = true;
+                                gameRunning = false;
                             }
                             break;
                         case KEY_DOWN:
                             if (dir != UP) dir = DOWN;
                             else {
                                 showGameOver(score, time(0) - startTime);
-                                missionComplete = false;
-                                break;
+                                missionComplete = true;
+                                gameRunning = false;
                             }
                             break;
                         case KEY_LEFT:
                             if (dir != RIGHT) dir = LEFT;
                             else {
                                 showGameOver(score, time(0) - startTime);
-                                missionComplete = false;
-                                break;
+                                missionComplete = true;
+                                gameRunning = false;
                             }
                             break;
                         case KEY_RIGHT:
                             if (dir != LEFT) dir = RIGHT;
                             else {
                                 showGameOver(score, time(0) - startTime);
-                                missionComplete = false;
-                                break;
+                                missionComplete = true;
+                                gameRunning = false;
                             }
                             break;
                         default:
                             break;
                     }
+
+                    if (!gameRunning) {
+                        break;
+                    }
+
                     score++; // 움직일 때마다 점수 증가
                     if (!moveSnake(map, snake, dir, score, growthItems, poisonItems, gateUses, gate1, gate2)) {
                         int timeElapsed = time(0) - startTime;
                         showGameOver(score, timeElapsed);  // 게임 오버 메시지 출력
-                        missionComplete = false;
-                        break; // 충돌 발생 시 게임 종료
+                        missionComplete = true;
+                        gameRunning = false;
                     }
                     if (snake.size() > maxLength) {
                         maxLength = snake.size();
@@ -579,8 +580,8 @@ int main() {
                         lastUpdateTime = time(0);
                     }
                     if (slowDownEndTime > 0 && time(0) >= slowDownEndTime) {
-                            speed = 100000; // 기본 속도로 원복
-                            slowDownEndTime = 0; // 효과 시간 초기화
+                        speed = 100000; // 기본 속도로 원복
+                        slowDownEndTime = 0; // 효과 시간 초기화
                     }
                     usleep(speed); // 0.1초 대기 (뱀의 속도를 빠르게)
 
@@ -589,28 +590,27 @@ int main() {
                         missionComplete = true;
                         if (currentStage == totalStages) {
                             showCongrats(win);
+                            gameRunning = false;
                         } else {
                             showStageClear(win);
+                            currentStage++;
                         }
                     }
                 }
 
-                if (!missionComplete) {
-                    break; // 게임 종료
+                if (!gameRunning) {
+                    break;
                 }
             }
 
-            // 스테이지 1로 리셋
+            nodelay(stdscr, FALSE);
             currentStage = 1;
+        } else if (choice == '2') {
+            showInstructions();
+        } else if (choice == '3') {
+            break;
         }
-
-        nodelay(stdscr, FALSE);
-    } else if (choice == '2') {
-        showInstructions();
-    } else if (choice == '3') {
-        break;
     }
-}
 
     delwin(win);
     delwin(scoreWin);
